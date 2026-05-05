@@ -37,3 +37,4 @@ tests:
       - filepath
       - text
       - temporary
+      - containers
