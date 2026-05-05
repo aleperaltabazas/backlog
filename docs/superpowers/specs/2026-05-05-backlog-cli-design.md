@@ -75,7 +75,7 @@ No other subcommands. All task operations happen inside the TUI.
 │    Write tests    │                   │  ✓ Init repo            │
 │    API docs       │                   │                         │
 ├───────────────────┴───────────────────┴─────────────────────────┤
-│  [n] new  [shift+←/→] move  [enter] open  [d] delete  [q] quit │
+│  [n] new  [shift+←/→] move  [enter] open  [d] delete  [q] quit  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -83,21 +83,21 @@ The status bar at the bottom updates to reflect the keys available in the curren
 
 ### Navigation
 
-| Key | Action |
-|-----|--------|
+| Key       | Action                                   |
+| --------- | ---------------------------------------- |
 | `↑` / `↓` | Move between tasks in the current column |
-| `←` / `→` | Move focus between columns |
-| `enter` | Open detail panel for the selected task |
-| `q` | Quit |
+| `←` / `→` | Move focus between columns               |
+| `enter`   | Open detail panel for the selected task  |
+| `q`       | Quit                                     |
 
 ### Actions
 
-| Key | Action |
-|-----|--------|
-| `n` | Open new-task popup; type title, confirm with `enter`, cancel with `esc` |
-| `e` | Edit title (on board) or description (in detail panel) |
-| `shift+←` / `shift+→` | Move selected task to previous/next column |
-| `d` | Delete selected task; shows confirmation prompt before acting |
+| Key                   | Action                                                                   |
+| --------------------- | ------------------------------------------------------------------------ |
+| `n`                   | Open new-task popup; type title, confirm with `enter`, cancel with `esc` |
+| `e`                   | Edit title (on board) or description (in detail panel)                   |
+| `shift+←` / `shift+→` | Move selected task to previous/next column                               |
+| `d`                   | Delete selected task; shows confirmation prompt before acting            |
 
 ### Detail Panel
 
@@ -109,9 +109,12 @@ Overlays the board. Shows the full title and description. `e` opens the descript
 
 ### Module Layout
 
+Follows the standard `stack new` layout: executable entry point in `app/`, library code in `src/`, managed via `package.yaml` (hpack).
+
 ```
-src/
+app/
   Main.hs                 -- entry point, CLI argument dispatch
+src/
   Backlog/
     Types.hs              -- Task, Board, Column, AppState
     Discovery.hs          -- walk-up .backlog/ finder
@@ -123,6 +126,10 @@ src/
       TaskDetail.hs       -- detail overlay panel widget
       NewTask.hs          -- new task title input popup widget
       Confirm.hs          -- delete confirmation dialog widget
+test/
+  Spec.hs
+package.yaml
+stack.yaml
 ```
 
 ### Key Types
@@ -157,11 +164,11 @@ data AppState = AppState
 
 ### Dependencies
 
-| Package | Purpose |
-|---------|---------|
-| `brick` | TUI framework |
-| `vty` | Terminal backend for brick |
-| `directory` | File and directory I/O |
-| `filepath` | Path manipulation |
-| `text` | Text type |
-| `containers` | `Map` for board state |
+| Package      | Purpose                    |
+| ------------ | -------------------------- |
+| `brick`      | TUI framework              |
+| `vty`        | Terminal backend for brick |
+| `directory`  | File and directory I/O     |
+| `filepath`   | Path manipulation          |
+| `text`       | Text type                  |
+| `containers` | `Map` for board state      |
