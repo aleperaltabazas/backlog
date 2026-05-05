@@ -51,7 +51,7 @@ mkInitialState root b = AppState
   , confirmTarget = Nothing
   , editTarget    = Nothing
   , editIsTitle   = True
-  , editEditor    = E.editor NewTaskEditorName (Just 1) ""
+  , editEditor    = E.editor EditEditorName (Just 1) ""
   }
   where
     toList col tasks = BL.list (TaskListName col) (Vec.fromList tasks) 1
@@ -139,7 +139,7 @@ handleBoardEvent (VtyEvent vtye) = case vtye of
           { activeWidget = EditWidget
           , editTarget   = Just task
           , editIsTitle  = True
-          , editEditor   = E.editor NewTaskEditorName (Just 1) (taskTitle task) }
+          , editEditor   = E.editor EditEditorName (Just 1) (taskTitle task) }
   _                                -> return ()
 handleBoardEvent _ = return ()
 
@@ -158,7 +158,7 @@ handleDetailEvent (VtyEvent vtye) = case vtye of
           { activeWidget = EditWidget
           , editTarget   = Just task
           , editIsTitle  = False
-          , editEditor   = E.editor NewTaskEditorName Nothing (taskDescription task) }
+          , editEditor   = E.editor EditEditorName Nothing (taskDescription task) }
   _                        -> return ()
 handleDetailEvent _ = return ()
 
@@ -201,9 +201,12 @@ handleConfirmEvent (VtyEvent vtye) = case vtye of
       Just task -> do
         liftIO $ deleteTask (backlogRoot st) task
         modify $ \s ->
-          let col = taskColumn task
-              idx = fromMaybe 0 (BL.listSelected (taskLists s Map.! col))
-              lst = BL.listRemove idx (taskLists s Map.! col)
+          let col  = taskColumn task
+              lst0 = taskLists s Map.! col
+              idx  = fromMaybe 0 $
+                       Vec.findIndex (\t -> taskSlug t == taskSlug task)
+                                     (BL.listElements lst0)
+              lst  = BL.listRemove idx lst0
           in s { taskLists = Map.insert col lst (taskLists s)
                , activeWidget  = BoardWidget
                , confirmTarget = Nothing }

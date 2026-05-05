@@ -28,6 +28,7 @@ data ActiveWidget
 data ResourceName
   = TaskListName Column
   | NewTaskEditorName
+  | EditEditorName
   deriving (Eq, Ord, Show)
 
 columnName :: Column -> Text
