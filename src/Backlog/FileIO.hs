@@ -46,9 +46,13 @@ loadBoard root = do
 loadColumn :: FilePath -> Column -> IO [Task]
 loadColumn root col = do
   let dir = columnDir root col
-  entries <- listDirectory dir
-  let mdFiles = filter (\f -> takeExtension f == ".md") entries
-  mapM (loadTask root col) mdFiles
+  exists <- doesDirectoryExist dir
+  if not exists
+    then return []
+    else do
+      entries <- listDirectory dir
+      let mdFiles = filter (\f -> takeExtension f == ".md") entries
+      mapM (loadTask root col) mdFiles
 
 loadTask :: FilePath -> Column -> FilePath -> IO Task
 loadTask root col filename = do
