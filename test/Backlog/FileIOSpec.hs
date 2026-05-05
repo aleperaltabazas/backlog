@@ -32,3 +32,44 @@ spec = do
     it "sets the column from the provided argument" $ do
       let task = parseTaskFile Done "slug" "# Task\n"
       taskColumn task `shouldBe` Done
+
+  describe "loadBoard" $ do
+    it "loads tasks from all three column directories" $
+      withSystemTempDirectory "backlog-test" $ \tmp -> do
+        createDirectory (tmp </> "backlog")
+        createDirectory (tmp </> "wip")
+        createDirectory (tmp </> "done")
+        writeFile (tmp </> "backlog" </> "task-one.md") "# Task one\n"
+        writeFile (tmp </> "done"    </> "task-two.md") "# Task two\n\nDone."
+        board <- loadBoard tmp
+        length (board Map.! Backlog) `shouldBe` 1
+        length (board Map.! WIP)     `shouldBe` 0
+        length (board Map.! Done)    `shouldBe` 1
+
+  describe "writeTask" $ do
+    it "creates a file in the correct column directory" $
+      withSystemTempDirectory "backlog-test" $ \tmp -> do
+        mapM_ (createDirectory . (tmp </>)) ["backlog", "wip", "done"]
+        let task = Task "my-task" "My task" "Description." Backlog
+        writeTask tmp task
+        doesFileExist (tmp </> "backlog" </> "my-task.md") >>= (`shouldBe` True)
+
+  describe "moveTask" $ do
+    it "moves the file to the new column directory and updates taskColumn" $
+      withSystemTempDirectory "backlog-test" $ \tmp -> do
+        mapM_ (createDirectory . (tmp </>)) ["backlog", "wip", "done"]
+        let task = Task "my-task" "My task" "" Backlog
+        writeTask tmp task
+        moved <- moveTask tmp task WIP
+        taskColumn moved `shouldBe` WIP
+        doesFileExist (tmp </> "backlog" </> "my-task.md") >>= (`shouldBe` False)
+        doesFileExist (tmp </> "wip"     </> "my-task.md") >>= (`shouldBe` True)
+
+  describe "deleteTask" $ do
+    it "removes the task file from disk" $
+      withSystemTempDirectory "backlog-test" $ \tmp -> do
+        mapM_ (createDirectory . (tmp </>)) ["backlog", "wip", "done"]
+        let task = Task "my-task" "My task" "" Backlog
+        writeTask tmp task
+        deleteTask tmp task
+        doesFileExist (tmp </> "backlog" </> "my-task.md") >>= (`shouldBe` False)
