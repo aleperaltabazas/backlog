@@ -1,0 +1,39 @@
+name: backlog
+version: 0.1.0.0
+
+ghc-options: -Wall
+
+dependencies:
+  - base >= 4.7 && < 5
+
+library:
+  source-dirs: src
+  dependencies:
+    - brick >= 2.0
+    - vty
+    - directory
+    - filepath
+    - text
+    - containers
+    - vector
+    - microlens
+    - microlens-mtl
+
+executables:
+  backlog:
+    main: Main.hs
+    source-dirs: app
+    dependencies:
+      - backlog
+
+tests:
+  backlog-test:
+    main: Spec.hs
+    source-dirs: test
+    dependencies:
+      - backlog
+      - hspec
+      - directory
+      - filepath
+      - text
+      - temporary
