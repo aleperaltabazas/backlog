@@ -2,6 +2,7 @@ module Main where
 
 import Backlog.Discovery (findBacklogRoot)
 import Backlog.FileIO (loadBoard, initBacklog)
+import qualified Backlog.TUI
 import System.Environment (getArgs)
 import System.Exit (exitFailure)
 import System.IO (hPutStrLn, stderr)
@@ -23,5 +24,5 @@ launchTUI = do
         "no backlog found in this directory or any parent (run 'backlog init' to create one)"
       exitFailure
     Just root -> do
-      _board <- loadBoard root
-      putStrLn ("Found backlog at: " <> root)   -- placeholder until TUI is wired
+      board <- loadBoard root
+      Backlog.TUI.runTUI root board
