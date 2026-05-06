@@ -23,6 +23,7 @@ executables:
   backlog:
     main: Main.hs
     source-dirs: app
+    ghc-options: -threaded
     dependencies:
       - backlog
 
