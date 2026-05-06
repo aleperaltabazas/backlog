@@ -1,0 +1,72 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.37.0.
+--
+-- see: https://github.com/sol/hpack
+
+name:           backlog
+version:        0.1.0.0
+build-type:     Simple
+
+library
+  exposed-modules:
+      Backlog.Discovery
+      Backlog.FileIO
+      Backlog.Slug
+      Backlog.TUI
+      Backlog.Types
+      Backlog.Widgets.Board
+      Backlog.Widgets.Confirm
+      Backlog.Widgets.NewTask
+      Backlog.Widgets.TaskDetail
+  other-modules:
+      Paths_backlog
+  hs-source-dirs:
+      src
+  ghc-options: -Wall
+  build-depends:
+      base >=4.7 && <5
+    , brick >=2.0
+    , containers
+    , directory
+    , filepath
+    , microlens
+    , microlens-mtl
+    , text
+    , vector
+    , vty
+  default-language: Haskell2010
+
+executable backlog
+  main-is: Main.hs
+  other-modules:
+      Paths_backlog
+  hs-source-dirs:
+      app
+  ghc-options: -Wall -threaded
+  build-depends:
+      backlog
+    , base >=4.7 && <5
+  default-language: Haskell2010
+
+test-suite backlog-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      Backlog.DiscoverySpec
+      Backlog.FileIOSpec
+      Backlog.SlugSpec
+      Paths_backlog
+  hs-source-dirs:
+      test
+  ghc-options: -Wall
+  build-depends:
+      backlog
+    , base >=4.7 && <5
+    , containers
+    , directory
+    , filepath
+    , hspec
+    , temporary
+    , text
+  default-language: Haskell2010

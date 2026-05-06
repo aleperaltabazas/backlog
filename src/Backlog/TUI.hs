@@ -42,8 +42,8 @@ data AppState = AppState
 
 mkInitialState :: FilePath -> Board -> AppState
 mkInitialState root b = AppState
-  { taskLists     = Map.mapWithKey toList b
-  , focusedColumn = Backlog
+  { taskLists     = lists
+  , focusedColumn = pickFocus lists Backlog
   , activeWidget  = BoardWidget
   , backlogRoot   = root
   , statusMessage = Nothing
@@ -54,7 +54,7 @@ mkInitialState root b = AppState
   , editEditor    = E.editor EditEditorName (Just 1) ""
   }
   where
-    toList col tasks = BL.list (TaskListName col) (Vec.fromList tasks) 1
+    lists = Map.mapWithKey (\col tasks -> BL.list (TaskListName col) (Vec.fromList tasks) 1) b
 
 -- --------------------------------------------------------------------------
 -- App
@@ -126,8 +126,8 @@ handleBoardEvent (VtyEvent vtye) = case vtye of
       Just task -> modify $ \s -> s { activeWidget = ConfirmWidget, confirmTarget = Just task }
   V.EvKey V.KLeft       []         -> modify $ \s -> s { focusedColumn = prevCol (focusedColumn s) }
   V.EvKey V.KRight      []         -> modify $ \s -> s { focusedColumn = nextCol (focusedColumn s) }
-  V.EvKey V.KUp         []         -> modifyFocusedList BL.listMoveUp
-  V.EvKey V.KDown       []         -> modifyFocusedList BL.listMoveDown
+  V.EvKey V.KUp         []         -> handleListNav vtye
+  V.EvKey V.KDown       []         -> handleListNav vtye
   V.EvKey V.KLeft  [V.MShift]      -> get >>= \st -> shiftTask st prevCol
   V.EvKey V.KRight [V.MShift]      -> get >>= \st -> shiftTask st nextCol
   V.EvKey (V.KChar 'e') []         -> do
@@ -201,13 +201,15 @@ handleConfirmEvent (VtyEvent vtye) = case vtye of
       Just task -> do
         liftIO $ deleteTask (backlogRoot st) task
         modify $ \s ->
-          let col  = taskColumn task
-              lst0 = taskLists s Map.! col
-              idx  = fromMaybe 0 $
-                       Vec.findIndex (\t -> taskSlug t == taskSlug task)
-                                     (BL.listElements lst0)
-              lst  = BL.listRemove idx lst0
-          in s { taskLists = Map.insert col lst (taskLists s)
+          let col     = taskColumn task
+              lst0    = taskLists s Map.! col
+              idx     = fromMaybe 0 $
+                          Vec.findIndex (\t -> taskSlug t == taskSlug task)
+                                        (BL.listElements lst0)
+              lst     = BL.listRemove idx lst0
+              lists'  = Map.insert col lst (taskLists s)
+          in s { taskLists     = lists'
+               , focusedColumn = pickFocus lists' col
                , activeWidget  = BoardWidget
                , confirmTarget = Nothing }
   _ -> return ()
@@ -261,11 +263,21 @@ renderEditOverlay st =
 -- --------------------------------------------------------------------------
 -- Helpers
 
-modifyFocusedList
-  :: (BL.List ResourceName Task -> BL.List ResourceName Task)
-  -> EventM ResourceName AppState ()
-modifyFocusedList f =
-  modify $ \s -> s { taskLists = Map.adjust f (focusedColumn s) (taskLists s) }
+pickFocus :: Map.Map Column (BL.List ResourceName Task) -> Column -> Column
+pickFocus lists preferred
+  | notEmpty (lists Map.! preferred) = preferred
+  | otherwise =
+      case filter (notEmpty . (lists Map.!)) [minBound .. maxBound] of
+        []    -> preferred
+        (c:_) -> c
+  where notEmpty lst = not (Vec.null (BL.listElements lst))
+
+handleListNav :: V.Event -> EventM ResourceName AppState ()
+handleListNav vtye = do
+  st <- get
+  let col = focusedColumn st
+  newLst <- nestEventM' (taskLists st Map.! col) (BL.handleListEvent vtye)
+  modify $ \s -> s { taskLists = Map.insert col newLst (taskLists s) }
 
 shiftTask :: AppState -> (Column -> Column) -> EventM ResourceName AppState ()
 shiftTask st colFn = do
@@ -278,11 +290,11 @@ shiftTask st colFn = do
         moved <- liftIO $ moveTask (backlogRoot st) task newCol
         modify $ \s ->
           let srcList  = BL.listRemove idx (taskLists s Map.! col)
-              dstList  = BL.listInsert
-                           (Vec.length (BL.listElements (taskLists s Map.! newCol)))
-                           moved
-                           (taskLists s Map.! newCol)
-          in s { taskLists = Map.insert col srcList $ Map.insert newCol dstList (taskLists s) }
+              insertAt = Vec.length (BL.listElements (taskLists s Map.! newCol))
+              dstList  = BL.listMoveTo insertAt $
+                           BL.listInsert insertAt moved (taskLists s Map.! newCol)
+          in s { taskLists     = Map.insert col srcList $ Map.insert newCol dstList (taskLists s)
+               , focusedColumn = newCol }
 
 prevCol :: Column -> Column
 prevCol Backlog = Backlog

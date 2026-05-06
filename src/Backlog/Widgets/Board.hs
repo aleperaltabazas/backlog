@@ -25,5 +25,5 @@ renderColumn lists focused col =
      BL.renderList (renderTask isFocused) isFocused lst
 
 renderTask :: Bool -> Bool -> Task -> Widget ResourceName
-renderTask _colFocused selected task =
-  txt ((if selected then "> " else "  ") <> taskTitle task)
+renderTask colFocused selected task =
+  txt ((if colFocused && selected then "> " else "  ") <> taskTitle task)
