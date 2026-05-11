@@ -3,7 +3,7 @@
 module Backlog.Widgets.Board (renderBoard) where
 
 import Brick
-import Brick.Widgets.Border (borderWithLabel, vBorder)
+import Brick.Widgets.Border (border, borderWithLabel, vBorder)
 import qualified Brick.Widgets.List as BL
 import Data.List (intersperse)
 import qualified Data.Map.Strict as Map
@@ -26,4 +26,7 @@ renderColumn lists focused col =
 
 renderTask :: Bool -> Bool -> Task -> Widget ResourceName
 renderTask colFocused selected task =
+  padBottom (Pad 1) $
+  border $
+  padLeftRight 1 $
   txt ((if colFocused && selected then "> " else "  ") <> taskTitle task)
