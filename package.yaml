@@ -26,6 +26,7 @@ executables:
     ghc-options: -threaded
     dependencies:
       - backlog
+      - optparse-applicative
 
 tests:
   backlog-test:

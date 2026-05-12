@@ -3,17 +3,30 @@ module Main where
 import Backlog.Discovery (findBacklogRoot)
 import Backlog.FileIO (loadBoard, initBacklog)
 import qualified Backlog.TUI
-import System.Environment (getArgs)
+import Options.Applicative
 import System.Exit (exitFailure)
 import System.IO (hPutStrLn, stderr)
 
+data Command = Launch | Init
+
+commandParser :: Parser Command
+commandParser = subparser (command "init" initInfo) <|> pure Launch
+  where
+    initInfo = info (pure Init) (progDesc "Initialise a new .backlog/ in the current directory")
+
+opts :: ParserInfo Command
+opts = info (helper <*> commandParser)
+  ( fullDesc
+  <> progDesc "A terminal-based task board"
+  <> header "backlog - manage your tasks from the terminal"
+  )
+
 main :: IO ()
 main = do
-  args <- getArgs
-  case args of
-    ["init"] -> initBacklog
-    []       -> launchTUI
-    _        -> hPutStrLn stderr "Usage: backlog [init]" >> exitFailure
+  cmd <- execParser opts
+  case cmd of
+    Init   -> initBacklog
+    Launch -> launchTUI
 
 launchTUI :: IO ()
 launchTUI = do
