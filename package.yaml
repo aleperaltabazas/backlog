@@ -18,6 +18,7 @@ library:
     - vector
     - microlens
     - microlens-mtl
+    - optparse-applicative
 
 executables:
   backlog:
