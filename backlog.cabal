@@ -10,6 +10,7 @@ build-type:     Simple
 
 library
   exposed-modules:
+      Backlog.CLI
       Backlog.Discovery
       Backlog.FileIO
       Backlog.Slug
@@ -32,6 +33,7 @@ library
     , filepath
     , microlens
     , microlens-mtl
+    , optparse-applicative
     , text
     , vector
     , vty
@@ -48,12 +50,14 @@ executable backlog
       backlog
     , base >=4.7 && <5
     , optparse-applicative
+    , text
   default-language: Haskell2010
 
 test-suite backlog-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      Backlog.CLISpec
       Backlog.DiscoverySpec
       Backlog.FileIOSpec
       Backlog.SlugSpec

@@ -33,7 +33,7 @@ commandParser =
   <|> pure Launch
 
 initInfo :: ParserInfo Command
-initInfo = info (pure Init)
+initInfo = info (helper <*> pure Init)
   (progDesc "Initialise a new .backlog/ in the current directory")
 
 createInfo :: ParserInfo Command
