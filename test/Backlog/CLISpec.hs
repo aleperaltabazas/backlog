@@ -8,7 +8,7 @@ import Backlog.Types
 import System.IO.Temp (withSystemTempDirectory)
 import System.Directory (createDirectory, doesFileExist, withCurrentDirectory)
 import System.FilePath ((</>))
-import Backlog.CLI (findTask, runCreate, runMove)
+import Backlog.CLI (findTask, runCreate, runMove, runDelete)
 
 sampleBoard :: Board
 sampleBoard = Map.fromList
@@ -62,3 +62,12 @@ spec = do
         withCurrentDirectory tmp $ runMove "my-task" WIP False
         doesFileExist (root </> "backlog" </> "my-task.md") >>= (`shouldBe` False)
         doesFileExist (root </> "wip"     </> "my-task.md") >>= (`shouldBe` True)
+
+  describe "runDelete" $ do
+    it "deletes the task file when --yes is passed" $
+      withSystemTempDirectory "backlog-test" $ \tmp -> do
+        let root = tmp </> ".backlog"
+        mapM_ createDirectory [root, root </> "backlog", root </> "wip", root </> "done"]
+        writeFile (root </> "backlog" </> "my-task.md") "# My task\n"
+        withCurrentDirectory tmp $ runDelete "my-task" True False
+        doesFileExist (root </> "backlog" </> "my-task.md") >>= (`shouldBe` False)

@@ -10,7 +10,7 @@ module Backlog.CLI
   ) where
 
 import Backlog.Discovery (findBacklogRoot)
-import Backlog.FileIO (loadBoard, writeTask, moveTask)
+import Backlog.FileIO (loadBoard, writeTask, moveTask, deleteTask)
 import Backlog.Slug (toSlug, makeUniqueSlug)
 import Backlog.Types
 import qualified Data.Map.Strict as Map
@@ -18,7 +18,7 @@ import qualified Data.Text as T
 import Data.Maybe (listToMaybe)
 import Data.Text (Text)
 import Options.Applicative (ReadM, eitherReader)
-import System.IO (hPutStrLn, stderr)
+import System.IO (hPutStrLn, stderr, hFlush, stdout)
 import System.Exit (exitFailure)
 import Control.Monad (when)
 
@@ -73,7 +73,21 @@ runMove input dest verboseFlag = withRoot $ \root -> do
       "Moved '" <> T.unpack (taskSlug task) <> "' to " <> columnDirName dest
 
 runDelete :: Text -> Bool -> Bool -> IO ()
-runDelete = error "not implemented"
+runDelete input skipConfirm verboseFlag = withRoot $ \root -> do
+  board <- loadBoard root
+  withFoundTask board input $ \task -> do
+    confirmed <- if skipConfirm
+      then return True
+      else do
+        putStr $ "Delete '" <> T.unpack (taskSlug task) <> "'? [y/N] "
+        hFlush stdout
+        answer <- getLine
+        return (answer == "y" || answer == "Y")
+    if confirmed
+      then do
+        deleteTask root task
+        when verboseFlag $ putStrLn $ "Deleted '" <> T.unpack (taskSlug task) <> "'"
+      else putStrLn "Aborted."
 
 runUpdate :: Text -> Maybe Text -> Maybe Text -> Bool -> IO ()
 runUpdate = error "not implemented"
