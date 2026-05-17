@@ -28,6 +28,7 @@ executables:
     dependencies:
       - backlog
       - optparse-applicative
+      - text
 
 tests:
   backlog-test:
