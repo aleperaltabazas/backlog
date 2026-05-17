@@ -10,7 +10,7 @@ module Backlog.CLI
   ) where
 
 import Backlog.Discovery (findBacklogRoot)
-import Backlog.FileIO (loadBoard, writeTask)
+import Backlog.FileIO (loadBoard, writeTask, moveTask)
 import Backlog.Slug (toSlug, makeUniqueSlug)
 import Backlog.Types
 import qualified Data.Map.Strict as Map
@@ -45,6 +45,15 @@ withRoot action = do
       exitFailure
     Just root -> action root
 
+-- Helper to find a task by slug/title and run an action with it
+withFoundTask :: Board -> Text -> (Task -> IO a) -> IO a
+withFoundTask board input action =
+  case findTask board input of
+    Nothing   -> do
+      hPutStrLn stderr $ "error: task '" <> T.unpack input <> "' not found"
+      exitFailure
+    Just task -> action task
+
 runCreate :: Text -> Column -> Text -> Bool -> IO ()
 runCreate titleText col desc verboseFlag = withRoot $ \root -> do
   board <- loadBoard root
@@ -56,7 +65,12 @@ runCreate titleText col desc verboseFlag = withRoot $ \root -> do
   when verboseFlag $ putStrLn $ "Created task '" <> T.unpack slug <> "'"
 
 runMove :: Text -> Column -> Bool -> IO ()
-runMove = error "not implemented"
+runMove input dest verboseFlag = withRoot $ \root -> do
+  board <- loadBoard root
+  withFoundTask board input $ \task -> do
+    _ <- moveTask root task dest
+    when verboseFlag $ putStrLn $
+      "Moved '" <> T.unpack (taskSlug task) <> "' to " <> columnDirName dest
 
 runDelete :: Text -> Bool -> Bool -> IO ()
 runDelete = error "not implemented"
