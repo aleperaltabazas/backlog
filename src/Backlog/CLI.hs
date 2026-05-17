@@ -15,7 +15,7 @@ import Backlog.Slug (toSlug, makeUniqueSlug)
 import Backlog.Types
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as T
-import Data.Maybe (listToMaybe)
+import Data.Maybe (listToMaybe, isNothing, fromMaybe)
 import Data.Text (Text)
 import Options.Applicative (ReadM, eitherReader)
 import System.IO (hPutStrLn, stderr, hFlush, stdout)
@@ -90,4 +90,15 @@ runDelete input skipConfirm verboseFlag = withRoot $ \root -> do
       else putStrLn "Aborted."
 
 runUpdate :: Text -> Maybe Text -> Maybe Text -> Bool -> IO ()
-runUpdate = error "not implemented"
+runUpdate input mTitle mDesc verboseFlag = do
+  when (isNothing mTitle && isNothing mDesc) $ do
+    hPutStrLn stderr "provide at least --title or --description"
+    exitFailure
+  withRoot $ \root -> do
+    board <- loadBoard root
+    withFoundTask board input $ \task -> do
+      let task' = task { taskTitle       = fromMaybe (taskTitle task) mTitle
+                       , taskDescription = fromMaybe (taskDescription task) mDesc
+                       }
+      writeTask root task'
+      when verboseFlag $ putStrLn $ "Updated '" <> T.unpack (taskSlug task) <> "'"

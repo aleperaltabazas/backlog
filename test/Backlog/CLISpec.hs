@@ -8,7 +8,7 @@ import Backlog.Types
 import System.IO.Temp (withSystemTempDirectory)
 import System.Directory (createDirectory, doesFileExist, withCurrentDirectory)
 import System.FilePath ((</>))
-import Backlog.CLI (findTask, runCreate, runMove, runDelete)
+import Backlog.CLI (findTask, runCreate, runMove, runDelete, runUpdate)
 
 sampleBoard :: Board
 sampleBoard = Map.fromList
@@ -71,3 +71,22 @@ spec = do
         writeFile (root </> "backlog" </> "my-task.md") "# My task\n"
         withCurrentDirectory tmp $ runDelete "my-task" True False
         doesFileExist (root </> "backlog" </> "my-task.md") >>= (`shouldBe` False)
+
+  describe "runUpdate" $ do
+    it "updates the task title while preserving slug and description" $
+      withSystemTempDirectory "backlog-test" $ \tmp -> do
+        let root = tmp </> ".backlog"
+        mapM_ createDirectory [root, root </> "backlog", root </> "wip", root </> "done"]
+        writeFile (root </> "backlog" </> "my-task.md") "# My task\n\nOriginal description."
+        withCurrentDirectory tmp $ runUpdate "my-task" (Just "New title") Nothing False
+        content <- readFile (root </> "backlog" </> "my-task.md")
+        content `shouldBe` "# New title\n\nOriginal description."
+
+    it "updates the description while preserving the title" $
+      withSystemTempDirectory "backlog-test" $ \tmp -> do
+        let root = tmp </> ".backlog"
+        mapM_ createDirectory [root, root </> "backlog", root </> "wip", root </> "done"]
+        writeFile (root </> "backlog" </> "my-task.md") "# My task\n\nOriginal description."
+        withCurrentDirectory tmp $ runUpdate "my-task" Nothing (Just "New description.") False
+        content <- readFile (root </> "backlog" </> "my-task.md")
+        content `shouldBe` "# My task\n\nNew description."
