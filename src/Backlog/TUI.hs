@@ -16,6 +16,9 @@ import Data.Maybe (fromMaybe)
 import Control.Monad (when)
 import Control.Monad.IO.Class (liftIO)
 
+import qualified Data.Text.Zipper as Z
+import Data.Text.Zipper.Generic.Words (moveWordLeft, moveWordRight, deletePrevWord)
+
 import Backlog.Types
 import Backlog.FileIO (writeTask, deleteTask, moveTask)
 import Backlog.Slug (toSlug, makeUniqueSlug)
@@ -158,7 +161,7 @@ handleDetailEvent (VtyEvent vtye) = case vtye of
           { activeWidget = EditWidget
           , editTarget   = Just task
           , editIsTitle  = False
-          , editEditor   = E.editor EditEditorName Nothing (taskDescription task) }
+          , editEditor   = E.applyEdit Z.gotoBOF (E.editor EditEditorName Nothing (taskDescription task)) }
   _                        -> return ()
 handleDetailEvent _ = return ()
 
@@ -166,8 +169,11 @@ handleDetailEvent _ = return ()
 
 handleNewTaskEvent :: BrickEvent ResourceName () -> EventM ResourceName AppState ()
 handleNewTaskEvent ev@(VtyEvent vtye) = case vtye of
-  V.EvKey V.KEsc   [] -> modify $ \s -> s { activeWidget = BoardWidget }
-  V.EvKey V.KEnter [] -> do
+  V.EvKey V.KEsc        []         -> modify $ \s -> s { activeWidget = BoardWidget }
+  V.EvKey V.KLeft       [V.MCtrl] -> do { st <- get; ed <- nestEventM' (newTaskEdit st) (modify (E.applyEdit moveWordLeft));   modify $ \s -> s { newTaskEdit = ed } }
+  V.EvKey V.KRight      [V.MCtrl] -> do { st <- get; ed <- nestEventM' (newTaskEdit st) (modify (E.applyEdit moveWordRight));  modify $ \s -> s { newTaskEdit = ed } }
+  V.EvKey (V.KChar 'w') [V.MCtrl] -> do { st <- get; ed <- nestEventM' (newTaskEdit st) (modify (E.applyEdit deletePrevWord)); modify $ \s -> s { newTaskEdit = ed } }
+  V.EvKey V.KEnter []              -> do
     st <- get
     let title = T.strip $ mconcat $ E.getEditContents (newTaskEdit st)
     if T.null title
@@ -220,8 +226,11 @@ handleConfirmEvent _ = return ()
 
 handleEditEvent :: BrickEvent ResourceName () -> EventM ResourceName AppState ()
 handleEditEvent ev@(VtyEvent vtye) = case vtye of
-  V.EvKey V.KEsc   [] -> modify $ \s -> s { activeWidget = BoardWidget, editTarget = Nothing }
-  V.EvKey V.KEnter [] -> do
+  V.EvKey V.KEsc        []         -> modify $ \s -> s { activeWidget = BoardWidget, editTarget = Nothing }
+  V.EvKey V.KLeft       [V.MCtrl] -> do { st <- get; ed <- nestEventM' (editEditor st) (modify (E.applyEdit moveWordLeft));   modify $ \s -> s { editEditor = ed } }
+  V.EvKey V.KRight      [V.MCtrl] -> do { st <- get; ed <- nestEventM' (editEditor st) (modify (E.applyEdit moveWordRight));  modify $ \s -> s { editEditor = ed } }
+  V.EvKey (V.KChar 'w') [V.MCtrl] -> do { st <- get; ed <- nestEventM' (editEditor st) (modify (E.applyEdit deletePrevWord)); modify $ \s -> s { editEditor = ed } }
+  V.EvKey V.KEnter []              -> do
     st <- get
     case editTarget st of
       Nothing   -> modify $ \s -> s { activeWidget = BoardWidget }
@@ -255,7 +264,8 @@ renderEditOverlay st =
      borderWithLabel (txt label) $
      padAll 1 $
      vBox
-       [ E.renderEditor (vBox . map txt) True (editEditor st)
+       [ (if editIsTitle st then id else vLimit 10) $
+         E.renderEditor (vBox . map txt) True (editEditor st)
        , txt ""
        , txt "[enter] save  [esc] cancel"
        ]
