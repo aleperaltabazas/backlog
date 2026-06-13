@@ -47,6 +47,7 @@ createParser = Create
   <*> option CLI.columnReader
         ( long "row" <> short 'r' <> metavar "ROW"
        <> value Backlog <> showDefaultWith (const "backlog")
+       <> completeWith ["backlog", "wip", "done"]
        <> help "Column: backlog|wip|done" )
   <*> (T.pack <$> strOption
         ( long "description" <> short 'd' <> metavar "DESCRIPTION"
@@ -61,7 +62,9 @@ moveParser :: Parser Command
 moveParser = Move
   <$> (T.pack <$> argument str (metavar "TASK" <> help "Task slug or title"))
   <*> option CLI.columnReader
-        ( long "to" <> metavar "DESTINATION" <> help "Destination column: backlog|wip|done" )
+        ( long "to" <> metavar "DESTINATION"
+       <> completeWith ["backlog", "wip", "done"]
+       <> help "Destination column: backlog|wip|done" )
   <*> switch ( long "verbose" <> short 'v' <> help "Print confirmation on success" )
 
 deleteInfo :: ParserInfo Command
