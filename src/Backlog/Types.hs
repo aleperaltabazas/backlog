@@ -21,14 +21,12 @@ data ActiveWidget
   = BoardWidget
   | DetailWidget
   | NewTaskWidget
-  | EditWidget      -- editing an existing task's title (on board) or description (in detail)
   | ConfirmWidget
   deriving (Eq, Show)
 
 data ResourceName
   = TaskListName Column
   | NewTaskEditorName
-  | EditEditorName
   deriving (Eq, Ord, Show)
 
 columnName :: Column -> Text

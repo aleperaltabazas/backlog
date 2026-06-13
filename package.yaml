@@ -20,6 +20,7 @@ library:
     - microlens-mtl
     - optparse-applicative
     - text-zipper
+    - process
 
 executables:
   backlog:

@@ -4,6 +4,7 @@ module Backlog.FileIO
   ( parseTaskFile
   , serializeTask
   , columnDir
+  , taskFilePath
   , loadBoard
   , writeTask
   , deleteTask
@@ -23,6 +24,10 @@ import System.Exit (exitFailure)
 
 columnDir :: FilePath -> Column -> FilePath
 columnDir root col = root </> columnDirName col
+
+taskFilePath :: FilePath -> Task -> FilePath
+taskFilePath root task =
+  columnDir root (taskColumn task) </> T.unpack (taskSlug task) <> ".md"
 
 parseTaskFile :: Column -> Text -> Text -> Task
 parseTaskFile col slug content =
