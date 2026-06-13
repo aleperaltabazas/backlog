@@ -119,12 +119,12 @@ handleBoardEvent (VtyEvent vtye) = case vtye of
     case selectedTask st of
       Nothing   -> return ()
       Just task -> modify $ \s -> s { activeWidget = ConfirmWidget, confirmTarget = Just task }
-  V.EvKey V.KLeft       []         -> modify $ \s -> s { focusedColumn = prevCol (focusedColumn s) }
-  V.EvKey V.KRight      []         -> modify $ \s -> s { focusedColumn = nextCol (focusedColumn s) }
+  V.EvKey V.KLeft       []         -> modify $ \s -> s { focusedColumn = prevCol (taskLists s) (focusedColumn s) }
+  V.EvKey V.KRight      []         -> modify $ \s -> s { focusedColumn = nextCol (taskLists s) (focusedColumn s) }
   V.EvKey V.KUp         []         -> handleListNav vtye
   V.EvKey V.KDown       []         -> handleListNav vtye
-  V.EvKey V.KLeft  [V.MShift]      -> get >>= \st -> shiftTask st prevCol
-  V.EvKey V.KRight [V.MShift]      -> get >>= \st -> shiftTask st nextCol
+  V.EvKey V.KLeft  [V.MShift]      -> get >>= \st -> shiftTask st rawPrevCol
+  V.EvKey V.KRight [V.MShift]      -> get >>= \st -> shiftTask st rawNextCol
   V.EvKey (V.KChar 'e') []         -> do
     st <- get
     case selectedTask st of
@@ -267,12 +267,24 @@ shiftTask st colFn = do
           in s { taskLists     = Map.insert col srcList $ Map.insert newCol dstList (taskLists s)
                , focusedColumn = newCol }
 
-prevCol :: Column -> Column
-prevCol Backlog = Backlog
-prevCol WIP     = Backlog
-prevCol Done    = WIP
+prevCol, nextCol :: Map.Map Column (BL.List ResourceName Task) -> Column -> Column
+prevCol = stepCol [Done, WIP, Backlog]
+nextCol = stepCol [Backlog, WIP, Done]
 
-nextCol :: Column -> Column
-nextCol Backlog = WIP
-nextCol WIP     = Done
-nextCol Done    = Done
+stepCol :: [Column] -> Map.Map Column (BL.List ResourceName Task) -> Column -> Column
+stepCol order lists col =
+  let after    = drop 1 $ dropWhile (/= col) (cycle order)
+      nonEmpty c = not $ Vec.null $ BL.listElements (lists Map.! c)
+  in case take (length order - 1) (filter nonEmpty after) of
+       (c:_) -> c
+       []    -> col
+
+rawPrevCol :: Column -> Column
+rawPrevCol Backlog = Done
+rawPrevCol WIP     = Backlog
+rawPrevCol Done    = WIP
+
+rawNextCol :: Column -> Column
+rawNextCol Backlog = WIP
+rawNextCol WIP     = Done
+rawNextCol Done    = Backlog
