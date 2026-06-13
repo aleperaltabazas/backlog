@@ -3,8 +3,7 @@
 module Backlog.TUI (runTUI) where
 
 import Brick
-import Brick.Widgets.Border (borderWithLabel, hBorder)
-import Brick.Widgets.Center (centerLayer)
+import Brick.Widgets.Border (hBorder)
 import qualified Brick.Widgets.List as BL
 import qualified Brick.Widgets.Edit as E
 import qualified Graphics.Vty as V
@@ -16,16 +15,17 @@ import Data.Maybe (fromMaybe)
 import Control.Monad (when)
 import Control.Monad.IO.Class (liftIO)
 
-import qualified Data.Text.Zipper as Z
 import Data.Text.Zipper.Generic.Words (moveWordLeft, moveWordRight, deletePrevWord)
 
 import Backlog.Types
-import Backlog.FileIO (writeTask, deleteTask, moveTask)
+import Backlog.FileIO (writeTask, deleteTask, moveTask, taskFilePath, loadBoard)
 import Backlog.Slug (toSlug, makeUniqueSlug)
 import Backlog.Widgets.Board (renderBoard)
 import Backlog.Widgets.TaskDetail (renderTaskDetail)
 import Backlog.Widgets.NewTask (renderNewTask)
 import Backlog.Widgets.Confirm (renderConfirm)
+import System.Environment (lookupEnv)
+import System.Process (system)
 
 -- --------------------------------------------------------------------------
 -- State
@@ -38,9 +38,6 @@ data AppState = AppState
   , statusMessage :: Maybe Text
   , newTaskEdit   :: E.Editor Text ResourceName
   , confirmTarget :: Maybe Task
-  , editTarget    :: Maybe Task
-  , editIsTitle   :: Bool
-  , editEditor    :: E.Editor Text ResourceName
   }
 
 mkInitialState :: FilePath -> Board -> AppState
@@ -52,9 +49,6 @@ mkInitialState root b = AppState
   , statusMessage = Nothing
   , newTaskEdit   = E.editor NewTaskEditorName (Just 1) ""
   , confirmTarget = Nothing
-  , editTarget    = Nothing
-  , editIsTitle   = True
-  , editEditor    = E.editor EditEditorName (Just 1) ""
   }
   where
     lists = Map.mapWithKey (\col tasks -> BL.list (TaskListName col) (Vec.fromList tasks) 1) b
@@ -88,7 +82,6 @@ drawUI st =
        BoardWidget   -> [base]
        DetailWidget  -> maybe [base] (\t -> [renderTaskDetail t, base]) (selectedTask st)
        NewTaskWidget -> [renderNewTask (newTaskEdit st), base]
-       EditWidget    -> [renderEditOverlay st, base]
        ConfirmWidget -> maybe [base] (\t -> [renderConfirm t, base]) (confirmTarget st)
 
 selectedTask :: AppState -> Maybe Task
@@ -105,7 +98,6 @@ handleEvent ev = do
     BoardWidget   -> handleBoardEvent ev
     DetailWidget  -> handleDetailEvent ev
     NewTaskWidget -> handleNewTaskEvent ev
-    EditWidget    -> handleEditEvent ev
     ConfirmWidget -> handleConfirmEvent ev
 
 -- Board
@@ -137,12 +129,9 @@ handleBoardEvent (VtyEvent vtye) = case vtye of
     st <- get
     case selectedTask st of
       Nothing   -> return ()
-      Just task ->
-        modify $ \s -> s
-          { activeWidget = EditWidget
-          , editTarget   = Just task
-          , editIsTitle  = True
-          , editEditor   = E.editor EditEditorName (Just 1) (taskTitle task) }
+      Just task -> suspendAndResume $ do
+        openEditor (backlogRoot st) task
+        reloadState st
   _                                -> return ()
 handleBoardEvent _ = return ()
 
@@ -156,12 +145,9 @@ handleDetailEvent (VtyEvent vtye) = case vtye of
     st <- get
     case selectedTask st of
       Nothing   -> return ()
-      Just task ->
-        modify $ \s -> s
-          { activeWidget = EditWidget
-          , editTarget   = Just task
-          , editIsTitle  = False
-          , editEditor   = E.applyEdit Z.gotoBOF (E.editor EditEditorName Nothing (taskDescription task)) }
+      Just task -> suspendAndResume $ do
+        openEditor (backlogRoot st) task
+        reloadState st
   _                        -> return ()
 handleDetailEvent _ = return ()
 
@@ -185,8 +171,9 @@ handleNewTaskEvent ev@(VtyEvent vtye) = case vtye of
             task          = Task slug title "" col
         liftIO $ writeTask (backlogRoot st) task
         modify $ \s ->
-          let lst  = taskLists s Map.! col
-              lst' = BL.listInsert (Vec.length (BL.listElements lst)) task lst
+          let lst    = taskLists s Map.! col
+              newIdx = Vec.length (BL.listElements lst)
+              lst'   = BL.listMoveTo newIdx $ BL.listInsert newIdx task lst
           in s { taskLists = Map.insert col lst' (taskLists s), activeWidget = BoardWidget }
   _ -> do
     st <- get
@@ -222,53 +209,27 @@ handleConfirmEvent (VtyEvent vtye) = case vtye of
   where dismiss = modify $ \s -> s { activeWidget = BoardWidget, confirmTarget = Nothing }
 handleConfirmEvent _ = return ()
 
--- Edit
+-- --------------------------------------------------------------------------
+-- External editor
 
-handleEditEvent :: BrickEvent ResourceName () -> EventM ResourceName AppState ()
-handleEditEvent ev@(VtyEvent vtye) = case vtye of
-  V.EvKey V.KEsc        []         -> modify $ \s -> s { activeWidget = BoardWidget, editTarget = Nothing }
-  V.EvKey V.KLeft       [V.MCtrl] -> do { st <- get; ed <- nestEventM' (editEditor st) (modify (E.applyEdit moveWordLeft));   modify $ \s -> s { editEditor = ed } }
-  V.EvKey V.KRight      [V.MCtrl] -> do { st <- get; ed <- nestEventM' (editEditor st) (modify (E.applyEdit moveWordRight));  modify $ \s -> s { editEditor = ed } }
-  V.EvKey (V.KChar 'w') [V.MCtrl] -> do { st <- get; ed <- nestEventM' (editEditor st) (modify (E.applyEdit deletePrevWord)); modify $ \s -> s { editEditor = ed } }
-  V.EvKey V.KEnter []              -> do
-    st <- get
-    case editTarget st of
-      Nothing   -> modify $ \s -> s { activeWidget = BoardWidget }
-      Just task -> do
-        let newText = T.strip $ mconcat $ E.getEditContents (editEditor st)
-        if T.null newText
-          then return ()
-          else do
-            let updated = if editIsTitle st
-                          then task { taskTitle = newText }
-                          else task { taskDescription = newText }
-            liftIO $ writeTask (backlogRoot st) updated
-            modify $ \s ->
-              let col = taskColumn task
-                  lst = taskLists s Map.! col
-                  updateTask t = if taskSlug t == taskSlug task then updated else t
-                  lst' = BL.listModify updateTask lst
-              in s { taskLists    = Map.insert col lst' (taskLists s)
-                   , activeWidget  = BoardWidget
-                   , editTarget    = Nothing }
-  _ -> do
-    st <- get
-    newEd <- nestEventM' (editEditor st) (E.handleEditorEvent ev)
-    modify $ \s -> s { editEditor = newEd }
-handleEditEvent _ = return ()
+openEditor :: FilePath -> Task -> IO ()
+openEditor root task = do
+  mEditor <- lookupEnv "EDITOR"
+  let editor = fromMaybe "vi" mEditor
+      path   = taskFilePath root task
+  _ <- system (editor <> " " <> path)
+  return ()
 
-renderEditOverlay :: AppState -> Widget ResourceName
-renderEditOverlay st =
-  let label = if editIsTitle st then " Edit title " else " Edit description "
-  in centerLayer $
-     borderWithLabel (txt label) $
-     padAll 1 $
-     vBox
-       [ (if editIsTitle st then id else vLimit 10) $
-         E.renderEditor (vBox . map txt) True (editEditor st)
-       , txt ""
-       , txt "[enter] save  [esc] cancel"
-       ]
+reloadState :: AppState -> IO AppState
+reloadState st = do
+  board <- loadBoard (backlogRoot st)
+  let lists = Map.mapWithKey (\c tasks -> BL.list (TaskListName c) (Vec.fromList tasks) 1) board
+      col   = focusedColumn st
+      oldSel = fmap fst $ BL.listSelectedElement (taskLists st Map.! col)
+      lists' = case oldSel of
+                 Just idx -> Map.adjust (BL.listMoveTo idx) col lists
+                 Nothing  -> lists
+  return st { taskLists = lists' }
 
 -- --------------------------------------------------------------------------
 -- Helpers
